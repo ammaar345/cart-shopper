@@ -1,26 +1,237 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ---------------------------------------------------------------------------
+   Cart Shopper — "Warm Editorial Market"
+   Warm paper base · espresso ink · one charged clay accent · Fraunces serif
+   display. No gradients on actions or surfaces. Squared buttons, underline
+   tabs, duotone product tiles. Deliberately not the SaaS-indigo default.
+--------------------------------------------------------------------------- */
+@theme {
+  /* Brand — clay / terracotta, the single charged accent */
+  --color-primary: #c0532f;
+  --color-primary-dark: #a44324;
+  --color-primary-deep: #7c2f14;
+  --color-primary-soft: #f7e9e3;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Accent — aged gold for stars + sale stamps */
+  --color-accent: #b08a2e;
+  --color-accent-dark: #93701f;
+  --color-accent-soft: #f3e7c9;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* Secondary — deep pine, quiet contrast (progress, info) */
+  --color-secondary: #2f5e52;
+  --color-secondary-soft: #e4efea;
+
+  /* Surfaces — warm, paper-leaning neutrals */
+  --color-bg: #faf6f0;
+  --color-surface: #fffefa;
+  --color-cream: #f1ebe1;
+  --color-border-soft: #e5ded2;
+
+  /* Ink — warm espresso */
+  --color-ink: #221d18;
+  --color-ink-soft: #6b6257;
+
+  /* Feedback — muted, warm-tuned */
+  --color-success: #3e7c4f;
+  --color-success-soft: #e5f0e6;
+  --color-error: #b3261e;
+  --color-error-soft: #f9e6e3;
+
+  /* Fonts */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Shadows — warm-tinted, crisp */
+  --shadow-soft: 0 10px 30px -14px rgb(34 29 24 / 0.18);
+  --shadow-lift: 0 24px 50px -22px rgb(192 83 47 / 0.28);
+  --shadow-amber: 0 14px 32px -14px rgb(176 138 46 / 0.4);
+
+  /* Radii */
+  --radius-card: 0.875rem;
+  --radius-pill: 9999px;
+
+  /* Animations */
+  --animate-fade-up: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-pop: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-bounce-in: bounce-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.9); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes bounce-in {
+    0%   { transform: scale(0.4); }
+    60%  { transform: scale(1.25); }
+    100% { transform: scale(1); }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ---- Base ---- */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--color-bg);
+    background-image:
+      radial-gradient(90% 45% at 50% -6%, rgb(192 83 47 / 0.07), transparent 68%),
+      radial-gradient(55% 34% at 100% 2%, rgb(176 138 46 / 0.06), transparent 70%);
+    background-attachment: fixed;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--color-primary-soft);
+    color: var(--color-primary-deep);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+/* ---- Components: a designed button + tab system, not generic pills ---- */
+@layer components {
+  /* Buttons — squared, warm, pressable */
+  .btn {
+    @apply inline-flex cursor-pointer select-none items-center justify-center gap-2 font-semibold tracking-wide transition-all duration-200;
+  }
+  .btn:active {
+    transform: translateY(1px);
+  }
+
+  .btn-primary {
+    @apply rounded-lg bg-primary px-6 py-3 text-sm text-white shadow-[0_12px_28px_-14px_rgb(192_83_47_/_0.55)] hover:bg-primary-dark;
+  }
+  .btn-ink {
+    @apply rounded-lg bg-ink px-6 py-3 text-sm text-white hover:bg-black;
+  }
+  .btn-outline {
+    @apply rounded-lg border border-ink/25 px-6 py-3 text-sm text-ink hover:border-ink/50 hover:bg-cream;
+  }
+  .btn-ghost {
+    @apply text-sm text-primary underline decoration-transparent underline-offset-4 transition-colors hover:decoration-primary;
+  }
+  .btn-sm {
+    @apply px-4 py-2 text-xs;
+  }
+  .btn-lg {
+    @apply px-8 py-3.5 text-base;
+  }
+  .btn-block {
+    @apply flex w-full;
+  }
+
+  /* Tabs — editorial underline strip */
+  .tab-strip {
+    @apply flex items-center gap-7 border-b border-border-soft;
+  }
+  .tab {
+    @apply relative cursor-pointer pb-3 text-sm font-semibold text-ink-soft transition-colors hover:text-ink;
+  }
+  .tab::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--color-ink);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tab-active {
+    @apply text-ink;
+  }
+  .tab-active::after {
+    transform: scaleX(1);
+  }
+
+  /* Section label */
+  .eyebrow {
+    @apply text-xs font-bold uppercase tracking-[0.18em] text-primary;
+  }
+
+  /* Badge / stamp */
+  .stamp {
+    @apply inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider;
+  }
+  .stamp-dark {
+    @apply border-ink bg-ink text-white;
+  }
+  .stamp-sale {
+    @apply border-accent bg-accent text-white;
+  }
+  .stamp-soft {
+    @apply border-border-soft bg-surface text-ink-soft;
+  }
+}
+
+/* ---- Utilities ---- */
+@utility card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+}
+
+@utility pill {
+  border-radius: var(--radius-pill);
+}
+
+@layer utilities {
+  /* Display type — serif, slightly tightened */
+  .font-display {
+    letter-spacing: -0.015em;
+  }
+
+  /* Underlined nav links */
+  .nav-link {
+    position: relative;
+    transition: color 0.2s ease;
+  }
+  .nav-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -4px;
+    height: 1px;
+    background: var(--color-primary);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .nav-link:hover::after,
+  .nav-link-active::after {
+    transform: scaleX(1);
+  }
+  .nav-link-active {
+    color: var(--color-ink);
+  }
+}
+
+/* Motion safety */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
