@@ -6,6 +6,11 @@
 Sleek animated e-commerce website for **physical goods**: browse catalog, cart,
 checkout, pay via **PayFast** (ZAR, SA). Catalog TBD — schema-first, brand-neutral.
 
+**Recent Enhancements:**
+- Added order confirmation page showing detailed order information after purchase
+- Enhanced user feedback with toast notifications (success/error) instead of browser alerts
+- Improved order flow UX with non-blocking notifications
+
 **Full plan: `PLAN.md`** — read it before any work. This file is the quick index.
 
 ## Locked decisions
@@ -60,7 +65,12 @@ Phase 1 BUILT and UI-overhauled: huashu design pass, fonts swapped (Sora/Manrope
 button color spread, background images with blur, admin page added, cart qty bug
 fixed. Production build passes; dev server smoke-tested 200 (home, shop, admin, cart).
 
+Phase 2 CHECKOUT IMPLEMENTED: Contact information, shipping address, payment
+method selection, order review, order confirmation pages, localStorage order
+persistence. Basic PayFast integration structure in place.
+
 ⚠️ **sneaky** is testing live — fix reported issues as they come.
 
-NOT done: real PayFast checkout (Phase 2), Supabase accounts/orders (Phase 3),
-free-shipping rate config, real product catalog + store name, admin DB persistence.
+NOT done: live PayFast sandbox integration (requires API credentials),
+Supabase accounts/orders (Phase 3), advanced shipping rate configuration,
+real product catalog + store name, admin DB persistence.
