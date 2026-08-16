@@ -196,12 +196,12 @@ export default function CartPage() {
             </div>
           </dl>
 
-          <button
-            onClick={() => alert("Checkout arrives in Phase 2 — PayFast integration.")}
+          <Link
+            href="/checkout"
             className="btn btn-primary btn-block mt-5 h-12"
           >
             Proceed to checkout
-          </button>
+          </Link>
 
           <p className="mt-3 text-center text-xs text-ink-soft">
             Secure checkout via PayFast · Card, Instant EFT &amp; more
