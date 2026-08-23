@@ -1,7 +1,11 @@
 /**
- * Temporary order storage using localStorage
- * This will be replaced with Supabase integration in Phase 3
+ * Temporary order storage using localStorage.
+ * When Supabase env vars are present (see src/lib/supabase.ts), each saved
+ * order is ALSO pushed to the `orders`/`order_items` tables — fire-and-forget,
+ * with localStorage remaining the source of truth until full Phase 3.
  */
+
+import { getSupabase, isSupabaseEnabled } from "@/lib/supabase";
 
 export interface Order {
   id: string;
@@ -34,6 +38,41 @@ export interface Order {
 
 const ORDER_STORAGE_KEY = "cart-shopper-orders";
 
+/** Best-effort mirror of an order into Supabase. Never throws. */
+function pushOrderToSupabase(order: Order): void {
+  if (!isSupabaseEnabled()) return;
+  const sb = getSupabase();
+  if (!sb) return;
+
+  void (async () => {
+    const { error } = await sb.from("orders").insert({
+      id: order.id,
+      subtotal_cents: order.subtotalCents,
+      shipping_cents: order.shippingCents,
+      discount_cents: order.discountCents ?? 0,
+      total_cents: order.totalCents,
+      coupon_code: order.couponCode ?? null,
+      status: order.status,
+      customer_info: order.customerInfo,
+      created_at: order.createdAt,
+    });
+    if (error) throw new Error(error.message);
+
+    const res = await sb.from("order_items").insert(
+      order.items.map((it) => ({
+        order_id: order.id,
+        product_id: it.productId,
+        name: it.name,
+        quantity: it.quantity,
+        price_cents: it.priceCents,
+      })),
+    );
+    if (res.error) throw new Error(res.error.message);
+  })().catch((err: Error) =>
+    console.error("Supabase order sync failed (kept locally):", err.message),
+  );
+}
+
 export const orderStorage = {
   // Save order to localStorage
   saveOrder: (order: Order): void => {
@@ -44,6 +83,7 @@ export const orderStorage = {
     } catch (error) {
       console.error("Failed to save order:", error);
     }
+    pushOrderToSupabase(order);
   },
 
   // Get all orders

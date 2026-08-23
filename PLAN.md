@@ -3,7 +3,7 @@
 Status: Phase 1 (Browse & Cart) implemented — Ready for Phase 2 (Checkout & PayFast)
 Date: 2026-08-13
 Owner: sneaky
-Location: `D:\BlueprintAgents\problem-research\cart-shopper\` (sibling to the
+Location: `D:\BlueprintAgents\problem-research\apps\cart-shopper\` (sibling to the
 quiz project, one folder up from `islamic-daily-quiz`)
 Repository: https://github.com/ammaar345/cart-shopper
 

@@ -105,10 +105,20 @@ Done:
   loading/missing fallback.
 
 🚨 STILL TO DO — do not drop these:
-1. Live PayFast sandbox integration (blocked on sneaky providing API credentials)
-2. Supabase migration for products/categories/orders (Phase 3)
-3. User accounts + auth (login/register, order history)
+1. Live PayFast sandbox integration — BLOCKED on sneaky creating a sandbox
+   profile at payfast.io and sharing Merchant ID / Key / passphrase
+2. Supabase catalog migration (products/categories/coupons) — order sync is
+   LIVE once env vars are set (see SUPABASE.md); catalog tables still local
+3. User accounts + auth (login/register) — orders page notes device-only
 4. Order confirmation emails
-5. SEO pass (metadata, sitemap, og images)
-6. Analytics events (view item, add to cart, purchase)
-7. Inventory low-stock alerts, coupon codes, product reviews
+5. Analytics events (view item, add to cart, purchase)
+
+Done since Aug 23 session start:
+- SEO pack: metadata templates, per-product OG images, sitemap.xml, robots.txt,
+  noindex layouts for cart/checkout/admin/orders (src/lib/site.ts holds SITE_URL)
+- Coupons end-to-end: admin Coupons tab CRUD, cart apply UI, checkout discount
+  math, discountCents/couponCode on orders; seeds WELCOME10 + SAVE50
+- /orders history page with status chips; nav link added
+- Admin low-stock alerts (banner + red rows at ≤5 stock)
+- Supabase scaffold dormant: supabase/schema.sql, src/lib/supabase.ts,
+  dual-write of orders on save, .env.example, SUPABASE.md
