@@ -3,7 +3,7 @@
 import { formatZar } from "@/lib/format";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useCartStore } from "@/lib/store";
+import { useCartStore, appliedCoupon } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import CheckoutStepper from "@/components/CheckoutStepper";
 import { orderStorage } from "@/lib/orderStorage";
@@ -21,7 +21,7 @@ function FieldError({ msg }: { msg: string | null }) {
 }
 
 export default function CheckoutClient() {
-  const { items } = useCartStore();
+  const { items, couponCode } = useCartStore();
   const [step, setStep] = useState<"contact" | "shipping" | "payment" | "review">("contact");
   const [isPlacing, setIsPlacing] = useState(false);
   const [formData, setFormData] = useState({
@@ -121,8 +121,10 @@ export default function CheckoutClient() {
   }, 0);
 
   const FREE_SHIPPING_THRESHOLD_CENTS = 75000;
+  // Coupon discount (validated against current subtotal — silently drops if invalid)
+  const discountCents = appliedCoupon(couponCode, subtotal)?.discountCents ?? 0;
   const shippingCost = subtotal >= FREE_SHIPPING_THRESHOLD_CENTS ? 0 : 5000; // R50 shipping if under free threshold
-  const total = subtotal + shippingCost;
+  const total = subtotal - discountCents + shippingCost;
 
   const handleNext = () => {
     switch (step) {
@@ -207,6 +209,8 @@ export default function CheckoutClient() {
         subtotalCents: subtotal,
         shippingCents: shippingCost,
         totalCents: total,
+        discountCents,
+        couponCode: discountCents > 0 ? couponCode : null,
         status: "confirmed",
         createdAt: new Date().toISOString(),
         customerInfo: {
@@ -224,8 +228,9 @@ export default function CheckoutClient() {
       // Save order to localStorage
       orderStorage.saveOrder(order);
 
-      // Clear cart after order
+      // Clear cart and applied coupon after order
       useCartStore.getState().clear();
+      useCartStore.getState().clearCoupon();
 
       // Clear checkout draft so the next visit starts fresh
       try {
@@ -316,6 +321,13 @@ export default function CheckoutClient() {
                     <span className="text-ink-soft">Subtotal</span>
                     <span className="font-semibold text-ink">{formatZar(subtotal)}</span>
                   </div>
+
+                  {discountCents > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-ink-soft">Discount ({couponCode})</span>
+                      <span className="font-semibold text-success">−{formatZar(discountCents)}</span>
+                    </div>
+                  )}
 
                   <div className="flex justify-between text-sm">
                     <span className="text-ink-soft">Shipping</span>
@@ -773,6 +785,13 @@ export default function CheckoutClient() {
                               <span className="text-ink-soft">Subtotal</span>
                               <span className="font-semibold text-ink">{formatZar(subtotal)}</span>
                             </div>
+
+                            {discountCents > 0 && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-ink-soft">Discount ({couponCode})</span>
+                                <span className="font-semibold text-success">−{formatZar(discountCents)}</span>
+                              </div>
+                            )}
 
                             <div className="flex justify-between text-sm">
                               <span className="text-ink-soft">Shipping</span>

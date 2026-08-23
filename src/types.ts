@@ -56,3 +56,16 @@ export interface CartItem {
   productId: string;
   qty: number;
 }
+
+export interface Coupon {
+  id: string;
+  /** Uppercase code the customer types, e.g. WELCOME10. */
+  code: string;
+  /** percent → value is 1-100; fixed → value is cents. */
+  type: "percent" | "fixed";
+  value: number;
+  /** Minimum cart subtotal for the coupon to apply, in cents. */
+  minSubtotalCents: number;
+  active: boolean;
+  createdAt?: string;
+}

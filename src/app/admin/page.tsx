@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { CATEGORIES } from "@/lib/catalog";
-import type { Product, Category, ColorKey } from "@/types";
+import type { Product, Category, ColorKey, Coupon } from "@/types";
 import { productsApi, categoriesApi } from "@/lib/storage";
+import { couponsApi } from "@/lib/couponStorage";
 import { VALID_COLORS, colorOf, tileClass, tileInkClass } from "@/lib/colors";
 import { productImageUrl } from "@/lib/images";
+import { formatZar } from "@/lib/format";
 import {
   PlusIcon,
   TrashIcon2 as TrashIcon,
@@ -52,8 +54,18 @@ const EMPTY_CAT = {
   color: "indigo" as ColorKey,
 } as Category & { id?: string };
 
-type Tab = "products" | "categories";
+const EMPTY_COUPON: Omit<Coupon, "id"> = {
+  code: "",
+  type: "percent",
+  value: 10,
+  minSubtotalCents: 0,
+  active: true,
+  createdAt: new Date().toISOString(),
+};
+
+type Tab = "products" | "categories" | "coupons";
 type ProductForm = Omit<Product, "id"> & { id?: string };
+type CouponForm = Omit<Coupon, "id"> & { id?: string };
 
 // ── main component ─────────────────────────────────────────────────────────────
 
@@ -61,6 +73,9 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("products");
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [editingCoupon, setEditingCoupon] = useState<CouponForm | null>(null);
+  const [showCouponForm, setShowCouponForm] = useState(false);
   const [editing, setEditing] = useState<ProductForm | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingCat, setEditingCat] = useState<(Category & { id?: string }) | null>(null);
@@ -70,6 +85,7 @@ export default function AdminPage() {
   const load = useCallback(() => {
     setProducts(productsApi.list());
     setCategories(categoriesApi.list());
+    setCoupons(couponsApi.list());
   }, []);
 
   useEffect(() => {
@@ -208,6 +224,67 @@ export default function AdminPage() {
     });
   };
 
+  // ── coupon CRUD ───────────────────────────────────────────────────────────────
+
+  const openNewCoupon = () => {
+    setEditingCoupon({ ...EMPTY_COUPON });
+    setShowCouponForm(true);
+  };
+
+  const openEditCoupon = (c: Coupon) => {
+    setEditingCoupon({ ...c });
+    setShowCouponForm(true);
+  };
+
+  const saveCoupon = () => {
+    if (!editingCoupon) return;
+    const code = editingCoupon.code.trim().toUpperCase();
+    const errors: string[] = [];
+    if (!code) errors.push("Code is required");
+    else if (coupons.some((c) => c.code === code && c.id !== editingCoupon.id))
+      errors.push("That code already exists");
+    if (!(editingCoupon.value > 0)) errors.push("Discount value must be greater than zero");
+    else if (editingCoupon.type === "percent" && editingCoupon.value > 90)
+      errors.push("Percent discount cannot exceed 90%");
+    if (editingCoupon.minSubtotalCents < 0) errors.push("Minimum spend cannot be negative");
+
+    if (errors.length) {
+      toast.error(errors.join(" • "));
+      return;
+    }
+
+    if (editingCoupon.id) {
+      couponsApi.update(editingCoupon.id, { ...editingCoupon, code });
+    } else {
+      couponsApi.add({ ...editingCoupon, code, id: uid() });
+    }
+    setEditingCoupon(null);
+    setShowCouponForm(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+    load();
+  };
+
+  const toggleCouponActive = (c: Coupon) => {
+    couponsApi.update(c.id, { active: !c.active });
+    load();
+  };
+
+  const deleteCoupon = (id: string) => {
+    toast.error("Delete this coupon? This cannot be undone.", {
+      action: {
+        label: "Delete",
+        onClick: () => {
+          couponsApi.remove(id);
+          setSaved(true);
+          setTimeout(() => setSaved(false), 1800);
+          load();
+        },
+      },
+      onDismiss: () => {},
+    });
+  };
+
   // ── render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -252,15 +329,15 @@ export default function AdminPage() {
 
       {/* Tabs — editorial underline strip */}
       <div className="tab-strip">
-        {(["products", "categories"] as Tab[]).map((t) => (
+        {(["products", "categories", "coupons"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={cn("tab", tab === t && "tab-active")}
           >
-            {t === "products" ? "Products" : "Categories"}
+            {t.charAt(0).toUpperCase() + t.slice(1)}
             <span className="ml-1.5 text-xs font-semibold text-ink-soft">
-              {t === "products" ? products.length : categories.length}
+              {t === "products" ? products.length : t === "categories" ? categories.length : coupons.length}
             </span>
           </button>
         ))}
@@ -426,6 +503,90 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* ── Coupons panel ─────────────────────────────────────────────────── */}
+      {tab === "coupons" && (
+        <div className="grid gap-4">
+          <button onClick={openNewCoupon} className="btn btn-primary w-fit">
+            <PlusIcon className="h-4 w-4" />
+            Add coupon
+          </button>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {coupons.map((c) => (
+              <div
+                key={c.id}
+                className="group flex items-center gap-4 rounded-2xl border border-border-soft bg-surface p-4 transition-shadow hover:shadow-soft"
+              >
+                <div
+                  className={cn(
+                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border text-[10px] font-black uppercase",
+                    c.active
+                      ? "border-success/30 bg-success-soft text-success"
+                      : "border-border-soft bg-cream text-ink-soft/50 line-through",
+                  )}
+                  aria-hidden
+                >
+                  {c.type === "percent" ? `${c.value}%` : `R${Math.round(c.value / 100)}`}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-sm font-bold tracking-wide text-ink">
+                    {c.code}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-soft">
+                    {c.type === "percent"
+                      ? `${c.value}% off`
+                      : `${formatZar(c.value)} off`}
+                    {c.minSubtotalCents > 0 &&
+                      ` · min spend ${formatZar(c.minSubtotalCents)}`}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => toggleCouponActive(c)}
+                  className={cn(
+                    "shrink-0 cursor-pointer rounded-full px-3 py-1 text-xs font-bold transition-colors",
+                    c.active
+                      ? "bg-success-soft text-success hover:bg-error-soft hover:text-error"
+                      : "bg-cream text-ink-soft hover:bg-success-soft hover:text-success",
+                  )}
+                >
+                  {c.active ? "Active" : "Inactive"}
+                </button>
+
+                <div className="flex shrink-0 gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button
+                    onClick={() => openEditCoupon(c)}
+                    className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-cream hover:text-ink"
+                    aria-label={`Edit ${c.code}`}
+                  >
+                    <ChevronRightIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => deleteCoupon(c.id)}
+                    className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-error-soft hover:text-error"
+                    aria-label={`Delete ${c.code}`}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {coupons.length === 0 && (
+              <div className="col-span-full flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border-soft py-16 text-center">
+                <PlusIcon className="h-10 w-10 text-ink-soft/30" />
+                <p className="font-display text-lg font-semibold text-ink-soft">
+                  No coupons yet
+                </p>
+                <p className="text-sm text-ink-soft/70">
+                  Try WELCOME10 — 10% off, no minimum.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Product drawer panel ───────────────────────────────────────────── */}
       <AnimatePresence>
         {showForm && editing && (
@@ -451,6 +612,21 @@ export default function AdminPage() {
             onClose={() => {
               setShowCatForm(false);
               setEditingCat(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Coupon drawer panel ────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showCouponForm && editingCoupon && (
+          <CouponFormDrawer
+            form={editingCoupon}
+            onChange={setEditingCoupon}
+            onSave={saveCoupon}
+            onClose={() => {
+              setShowCouponForm(false);
+              setEditingCoupon(null);
             }}
           />
         )}
@@ -914,6 +1090,165 @@ function CategoryFormDrawer({
           </button>
           <button onClick={onSave} className="btn btn-primary btn-sm">
             {form.id ? "Save changes" : "Add category"}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Coupon form drawer ────────────────────────────────────────────────────────
+
+function CouponFormDrawer({
+  form,
+  onChange,
+  onSave,
+  onClose,
+}: {
+  form: CouponForm;
+  onChange: (f: CouponForm) => void;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  const update = <K extends keyof CouponForm>(
+    key: K,
+    value: CouponForm[K],
+  ) => onChange({ ...form, [key]: value });
+
+  const savingLabel =
+    form.type === "percent"
+      ? `${form.value}% off`
+      : `${formatZar(form.value)} off`;
+
+  return (
+    <motion.div
+      key="coupon-drawer"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink/40 backdrop-blur-sm p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", stiffness: 340, damping: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md overflow-hidden rounded-t-3xl bg-surface shadow-2xl sm:rounded-3xl"
+      >
+        <div className="flex justify-center pt-3 sm:hidden">
+          <div className="h-1.5 w-10 rounded-full bg-border-soft" />
+        </div>
+        <div className="flex items-center justify-between border-b border-border-soft px-6 py-4">
+          <h2 className="font-display text-lg font-bold text-ink">
+            {form.id ? "Edit coupon" : "New coupon"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-cream hover:text-ink"
+          >
+            <XIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="grid gap-5 px-6 py-5">
+          <Field label="Code *">
+            <input
+              value={form.code}
+              onChange={(e) =>
+                update("code", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))
+              }
+              className="w-full rounded-2xl border border-border-soft bg-cream/50 px-4 py-2.5 font-mono text-sm uppercase tracking-wide outline-none transition-colors focus:border-primary focus:bg-white"
+              placeholder="WELCOME10"
+            />
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Discount type">
+              <select
+                value={form.type}
+                onChange={(e) =>
+                  update("type", e.target.value as Coupon["type"])
+                }
+                className="w-full rounded-2xl border border-border-soft bg-cream/50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-primary focus:bg-white"
+              >
+                <option value="percent">Percent off</option>
+                <option value="fixed">Fixed amount off</option>
+              </select>
+            </Field>
+
+            <Field label={form.type === "percent" ? "Percent (1-90)" : "Amount (ZAR)"}>
+              <input
+                type="number"
+                step={form.type === "percent" ? "1" : "0.01"}
+                min="0"
+                value={
+                  form.type === "percent"
+                    ? form.value
+                    : (form.value / 100).toFixed(2)
+                }
+                onChange={(e) =>
+                  update(
+                    "value",
+                    form.type === "percent"
+                      ? Math.max(0, parseInt(e.target.value) || 0)
+                      : Math.max(
+                          0,
+                          Math.round(parseFloat(e.target.value || "0") * 100),
+                        ),
+                  )
+                }
+                className="w-full rounded-2xl border border-border-soft bg-cream/50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-primary focus:bg-white"
+              />
+            </Field>
+          </div>
+
+          <Field label="Minimum spend (ZAR, 0 = none)">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={(form.minSubtotalCents / 100).toFixed(2)}
+              onChange={(e) =>
+                update(
+                  "minSubtotalCents",
+                  Math.max(0, Math.round(parseFloat(e.target.value || "0") * 100)),
+                )
+              }
+              className="w-full rounded-2xl border border-border-soft bg-cream/50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-primary focus:bg-white"
+            />
+          </Field>
+
+          <label className="flex cursor-pointer items-center gap-3">
+            <input
+              type="checkbox"
+              checked={form.active}
+              onChange={(e) => update("active", e.target.checked)}
+              className="h-4 w-4 accent-[var(--color-primary)]"
+            />
+            <span className="text-sm font-semibold text-ink">
+              Active — customers can redeem this code
+            </span>
+          </label>
+
+          {/* Live preview */}
+          <div className="rounded-xl border border-border-soft bg-cream/60 px-4 py-3 text-sm">
+            <p className="font-semibold text-ink">{savingLabel}</p>
+            <p className="mt-0.5 text-xs text-ink-soft">
+              {form.minSubtotalCents > 0
+                ? `On carts of ${formatZar(form.minSubtotalCents)} or more`
+                : "On any cart"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-border-soft px-6 py-4">
+          <button onClick={onClose} className="btn btn-outline btn-sm">
+            Cancel
+          </button>
+          <button onClick={onSave} className="btn btn-primary btn-sm">
+            {form.id ? "Save changes" : "Add coupon"}
           </button>
         </div>
       </motion.div>

@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { useCartStore, cartSubtotalCents, cartCount } from "@/lib/store";
+import { useCartStore, cartSubtotalCents, cartCount, appliedCoupon } from "@/lib/store";
 import { PRODUCTS_BY_ID } from "@/lib/catalog";
 import { formatZar } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -16,11 +18,29 @@ export default function CartPage() {
   const items = useCartStore((s) => s.items);
   const setQty = useCartStore((s) => s.setQty);
   const removeItem = useCartStore((s) => s.removeItem);
+  const couponCode = useCartStore((s) => s.couponCode);
+  const applyCoupon = useCartStore((s) => s.applyCoupon);
+  const clearCoupon = useCartStore((s) => s.clearCoupon);
+  const [couponInput, setCouponInput] = useState("");
 
   const subtotal = cartSubtotalCents(items);
   const count = cartCount(items);
+  const applied = appliedCoupon(couponCode, subtotal);
+  const discount = applied?.discountCents ?? 0;
+  const total = subtotal - discount;
   const toFreeShip = Math.max(0, FREE_SHIPPING_THRESHOLD_CENTS - subtotal);
   const freeShipPct = Math.min(1, subtotal / FREE_SHIPPING_THRESHOLD_CENTS);
+
+  const handleApplyCoupon = () => {
+    if (!couponInput.trim()) return;
+    const error = applyCoupon(couponInput);
+    if (error) {
+      toast.error(error);
+    } else {
+      toast.success(`Coupon ${couponInput.trim().toUpperCase()} applied`);
+      setCouponInput("");
+    }
+  };
 
   if (items.length === 0) {
     return (
@@ -187,11 +207,54 @@ export default function CartPage() {
         <div className="card p-6">
           <h2 className="font-display text-xl font-bold text-ink">Order summary</h2>
 
+          {/* Coupon */}
+          {applied ? (
+            <div className="mt-4 flex items-center justify-between rounded-lg border border-success/30 bg-success-soft px-3 py-2.5 text-sm">
+              <span className="font-bold text-success">
+                {applied.coupon.code} applied
+              </span>
+              <button
+                onClick={() => {
+                  clearCoupon();
+                  toast.success("Coupon removed");
+                }}
+                className="cursor-pointer text-xs font-semibold text-success underline underline-offset-2 hover:opacity-70"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <form
+              className="mt-4 flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleApplyCoupon();
+              }}
+            >
+              <input
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                placeholder="Coupon code"
+                aria-label="Coupon code"
+                className="min-w-0 flex-1 rounded-lg border border-border-soft bg-bg px-3 py-2.5 text-sm uppercase tracking-wide outline-none transition-colors placeholder:normal-case placeholder:tracking-normal focus:border-primary"
+              />
+              <button type="submit" className="btn btn-outline btn-sm shrink-0">
+                Apply
+              </button>
+            </form>
+          )}
+
           <dl className="mt-4 grid gap-3 text-sm">
             <div className="flex justify-between">
               <dt className="text-ink-soft">Subtotal</dt>
               <dd className="font-semibold text-ink">{formatZar(subtotal)}</dd>
             </div>
+            {discount > 0 && (
+              <div className="flex justify-between">
+                <dt className="text-ink-soft">Discount ({applied?.coupon.code})</dt>
+                <dd className="font-semibold text-success">−{formatZar(discount)}</dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt className="text-ink-soft">Shipping</dt>
               <dd className="font-semibold text-ink">
@@ -201,7 +264,7 @@ export default function CartPage() {
             <div className="flex justify-between border-t border-border-soft pt-3">
               <dt className="font-semibold text-ink">Total</dt>
               <dd className="font-display text-2xl font-bold text-ink">
-                {formatZar(subtotal)}
+                {formatZar(total)}
               </dd>
             </div>
           </dl>
