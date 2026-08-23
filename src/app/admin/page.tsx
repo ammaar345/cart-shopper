@@ -19,6 +19,8 @@ import { cn } from "@/lib/cn";
 
 // ── local helpers ──────────────────────────────────────────────────────────────
 
+const LOW_STOCK_THRESHOLD = 5;
+
 function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -73,6 +75,8 @@ export default function AdminPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const lowStock = products.filter((p) => p.stock <= LOW_STOCK_THRESHOLD);
 
   // ── product CRUD ────────────────────────────────────────────────────────────
 
@@ -234,6 +238,18 @@ export default function AdminPage() {
         </AnimatePresence>
       </div>
 
+      {/* Low-stock alert */}
+      {lowStock.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-error/30 bg-error-soft px-4 py-3 text-sm">
+          <span className="font-bold uppercase tracking-wide text-error">
+            Low stock ({lowStock.length})
+          </span>
+          <span className="text-ink">
+            {lowStock.map((p) => `${p.name} (${p.stock})`).join(" · ")}
+          </span>
+        </div>
+      )}
+
       {/* Tabs — editorial underline strip */}
       <div className="tab-strip">
         {(["products", "categories"] as Tab[]).map((t) => (
@@ -300,8 +316,15 @@ export default function AdminPage() {
                       <span className="font-semibold text-ink">
                         R{(p.priceCents / 100).toFixed(2)}
                       </span>
-                      <span className="text-ink-soft/70">
+                      <span
+                        className={cn(
+                          p.stock <= LOW_STOCK_THRESHOLD
+                            ? "font-bold text-error"
+                            : "text-ink-soft/70",
+                        )}
+                      >
                         stock: {p.stock}
+                        {p.stock <= LOW_STOCK_THRESHOLD && " — low"}
                       </span>
                       {p.badge && (
                         <span className="stamp stamp-soft">{p.badge}</span>
