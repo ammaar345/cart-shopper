@@ -6,13 +6,20 @@
 Sleek animated e-commerce website for **physical goods**: browse catalog, cart,
 checkout, pay via **PayFast** (ZAR, SA). Catalog TBD — schema-first, brand-neutral.
 
-**Recent Enhancements:**
-- Wired the full checkout flow: contact → shipping → payment → review → place order
-- Order confirmation page (`/order-confirmation?id=CS-…`) reads from localStorage and
-  shows line items, shipping address, and totals — a client component (reads storage
-  only after mount/hydration)
-- Toast notifications (sonner) for success/error instead of blocking alerts
-- "Proceed to checkout" on `/cart` now links to the live `/checkout` page
+**Recent Enhancements (Aug 23 session):**
+- Real product photos everywhere (cards, detail, cart, drawer) via deterministic
+  picsum.photos per slug — admin can override with a custom `imageUrl` + preview
+- Coupon codes end-to-end: admin CRUD tab, apply UI on `/cart`, discount math in
+  `/checkout`, `discountCents`/`couponCode` recorded on orders (seeds WELCOME10, SAVE50)
+- `/orders` history page (device-local orders, status chips) + header nav link
+- Inline per-field checkout validation (red borders + messages after Continue),
+  sessionStorage checkout draft survives navigation, spinner/disabled Place order
+- Admin: low-stock banner + red stock rows at ≤5, save-time validation,
+  slug auto-derived from name and normalized while typing
+- SEO pack: metadata templates, per-product OG images, sitemap.xml, robots.txt,
+  noindex layouts for cart/checkout/admin/orders (site URL from NEXT_PUBLIC_SITE_URL)
+- Dormant Supabase sync: placed orders dual-write once env vars are set — see
+  SUPABASE.md; catalog stays local until Phase 3
 
 **Full plan: `PLAN.md`** — read it before any work. This file is the quick index.
 
@@ -54,25 +61,40 @@ No real DB yet — cart, admin edits, and orders persist to **localStorage** onl
   Seeds mirror `src/lib/catalog.ts`. **Not multi-device** — clear storage to reset.
 - **Qty rule:** `setQty` with qty ≤ 0 **removes the item** from cart (fixed — was
   clamped to 1 before).
+- **Coupons:** `src/lib/couponStorage.ts` — `couponsApi` CRUD over localStorage
+  (`cart-shopper-v1-coupons`) + `evaluateCoupon()`. Applied code lives in the
+  zustand cart store (`couponCode`, persisted). Discount recomputes against
+  subtotal at render time, so removing the coupon or shrinking the cart below
+  its minimum silently drops it.
+- **Checkout draft:** contact/shipping/step state persists to sessionStorage
+  (`cart-shopper-checkout-draft`); cleared after a successful order.
 - **Orders:** `src/lib/orderStorage.ts` — `saveOrder` / `getAllOrders` /
-  `getOrderById` over localStorage (`cart-shopper-orders`). Phase-3 Supabase will
-  replace this. Orders are device-local, so a confirmation page opened on a
-  different browser shows "Order not found".
+  `getOrderById` over localStorage (`cart-shopper-orders`). When Supabase env
+  vars are set, `saveOrder` also fire-and-forget inserts into the `orders` +
+  `order_items` tables (see SUPABASE.md); localStorage stays source of truth.
+  Orders are device-local, so a confirmation page opened on a different browser
+  shows "Order not found".
 
 ## Pages
 - `/` home — hero (bg image + blur), perks, category tiles, best sellers
 - `/shop` — search/filter/sort grid, category pills, price range
-- `/products/[slug]` — product detail + related
-- `/cart` — line items, free-shipping progress, order summary
+- `/products/[slug]` — product detail + photo hero + related
+- `/cart` — line items with photos, free-shipping progress, coupon apply box,
+  discount/total summary
 - `/checkout` — multi-step client flow (contact → shipping → payment → review),
-  `CheckoutStepper` progress bar, order summary sidebar, `CheckoutClient` at
-  `src/app/checkout/checkout-client.tsx`. Payment is a **mock/placeholder** until
-  PayFast sandbox is wired — "Place order" just saves the local order, clears the
-  cart, toasts, and redirects.
+  `CheckoutStepper` progress bar, inline field validation, order summary sidebar
+  with discount row, `CheckoutClient` at `src/app/checkout/checkout-client.tsx`.
+  Payment is a **mock/placeholder** until PayFast sandbox is wired — "Place
+  order" saves the local order (and mirrors to Supabase when configured), clears
+  cart + coupon, toasts, and redirects.
 - `/order-confirmation` — client component (`order-confirmation-client.tsx`)
   reading `orderStorage` by `?id=`, with an "Order not found" state
-- `/admin` — product + category CRUD (add/edit/delete), spring drawer forms,
-  feature preset chips, saved toast
+- `/orders` — device-local order history, status chips, totals; header nav link
+- `/admin` — product + category + coupon CRUD, spring drawer forms, low-stock
+  banner, feature preset chips, saved toast. All routes above except shop/home/
+  products are noindexed.
+- SEO: `src/app/sitemap.ts` (home, /shop, all product slugs) and
+  `src/app/robots.ts`; base URL from `NEXT_PUBLIC_SITE_URL` via `src/lib/site.ts`.
 
 ## Build status
 Phase 1 BUILT and UI-overhauled: huashu design pass, fonts swapped (Sora/Manrope),
@@ -84,11 +106,17 @@ method selection, order review, order confirmation pages, localStorage order
 persistence. /checkout renders a client flow; /order-confirmation is a client
 component (server-reading localStorage was 404'ing). Production build passes.
 
+Aug 23 2026: production build green with photos, coupons, /orders, low-stock,
+SEO routes (sitemap.xml + robots.txt appear in the route table), and the dormant
+Supabase sync. Deps: added `@supabase/supabase-js`. `.env.example` is tracked
+(force-added past the `.env*` ignore rule) — copy to `.env.local`.
+
 ⚠️ **sneaky** is testing live — fix reported issues as they come.
 
 NOT done: live PayFast sandbox integration (requires API credentials),
-Supabase accounts/orders (Phase 3), advanced shipping rate configuration,
-real product catalog + store name, admin DB persistence.
+Supabase auth + catalog migration (order sync is wired; products/categories/
+coupons still localStorage — see STILL TO DO below), advanced shipping rate
+configuration, real product catalog + store name.
 
 ## Status log (Aug 2026 session)
 
