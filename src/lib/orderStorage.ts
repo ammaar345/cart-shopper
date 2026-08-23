@@ -14,6 +14,10 @@ export interface Order {
   subtotalCents: number;
   shippingCents: number;
   totalCents: number;
+  /** Amount removed by a coupon, in cents; absent on pre-coupon orders. */
+  discountCents?: number;
+  /** Coupon code applied to this order, if any. */
+  couponCode?: string | null;
   status: "pending" | "confirmed" | "processing" | "shipped" | "delivered";
   createdAt: string;
   customerInfo: {

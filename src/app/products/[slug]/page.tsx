@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getProduct, getCategory, productsByCategory } from "@/lib/catalog";
+import { productImageUrl } from "@/lib/images";
 import { ProductDetail } from "./ProductDetail";
 
 export async function generateMetadata({
@@ -10,10 +11,17 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const product = getProduct(slug);
-  if (!product) return { title: "Not found — Cart Shopper" };
+  if (!product) return { title: "Not found", robots: { index: false } };
   return {
-    title: `${product.name} — Cart Shopper`,
-    description: product.tagline,
+    title: product.name,
+    description: `${product.tagline} — ${product.description}`.slice(0, 300),
+    alternates: { canonical: `/products/${product.slug}` },
+    openGraph: {
+      title: product.name,
+      description: product.tagline,
+      url: `/products/${product.slug}`,
+      images: [{ url: productImageUrl(product), width: 800, height: 800 }],
+    },
   };
 }
 

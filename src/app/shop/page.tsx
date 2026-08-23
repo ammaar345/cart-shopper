@@ -3,8 +3,10 @@ import { ShopGrid } from "./ShopGrid";
 import { CATEGORIES } from "@/lib/catalog";
 
 export const metadata: Metadata = {
-  title: "Shop — Cart Shopper",
-  description: "Browse our full catalog.",
+  title: "Shop",
+  description:
+    "Browse the full Cart Shopper catalog — audio, desk, kitchen, home, travel and wellness, shipped across South Africa.",
+  alternates: { canonical: "/shop" },
 };
 
 export default async function ShopPage({

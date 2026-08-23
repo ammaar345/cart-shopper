@@ -94,7 +94,7 @@ export default function OrdersPage() {
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <p className="font-display text-lg font-bold text-ink">
                 {formatZar(o.totalCents)}
-                {"discountCents" in o && o.discountCents > 0 && (
+                {(o.discountCents ?? 0) > 0 && (
                   <span className="ml-2 text-xs font-semibold text-success">
                     incl. discount
                   </span>
