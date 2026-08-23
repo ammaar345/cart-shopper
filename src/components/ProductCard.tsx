@@ -6,6 +6,7 @@ import type { Product } from "@/types";
 import { useCartStore } from "@/lib/store";
 import { formatZar } from "@/lib/format";
 import { colorOf, tileClass, tileInkClass } from "@/lib/colors";
+import { productImageUrl } from "@/lib/images";
 import { StarIcon, PlusIcon } from "./Icons";
 
 export function ProductCard({ product }: { product: Product }) {
@@ -17,20 +18,24 @@ export function ProductCard({ product }: { product: Product }) {
       layout
       className="group relative flex flex-col overflow-hidden rounded-card border border-border-soft bg-surface shadow-soft transition-shadow duration-400 hover:shadow-lift"
     >
-      {/* Image area — duotone tile */}
+      {/* Image area — photo over duotone tile (tile shows while photo loads) */}
       <Link href={`/products/${product.slug}`} className="relative block aspect-square overflow-hidden">
         <div
           className={`
-            flex h-full w-full items-center justify-center
-            transition-transform duration-700 ease-out
-            group-hover:scale-105
+            absolute inset-0 flex items-center justify-center
             ${tileClass(duo)}
           `}
         >
-          <span className={`font-display text-5xl font-bold transition-transform duration-500 group-hover:scale-110 ${tileInkClass(duo)}`}>
+          <span className={`font-display text-5xl font-bold ${tileInkClass(duo)}`}>
             {product.name.charAt(0)}
           </span>
         </div>
+        <img
+          src={productImageUrl(product)}
+          alt={product.name}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+        />
 
         {/* Stamps */}
         <div className="absolute left-3 top-3 flex flex-col gap-1.5">

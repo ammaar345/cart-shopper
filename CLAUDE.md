@@ -89,3 +89,26 @@ component (server-reading localStorage was 404'ing). Production build passes.
 NOT done: live PayFast sandbox integration (requires API credentials),
 Supabase accounts/orders (Phase 3), advanced shipping rate configuration,
 real product catalog + store name, admin DB persistence.
+
+## Status log (Aug 2026 session)
+
+Done:
+- Checkout draft persists via sessionStorage across navigation; cleared after
+  successful order placement.
+- Place-order buttons disabled with spinner during processing; double-submit guarded.
+- Step-validation failures use sonner toasts (blocking alerts removed).
+- Admin product form validates on save (name, slug format, price/stock/rating/
+  reviewCount ranges) and auto-derives slug from name on blur.
+- Real product images: deterministic per-slug picsum.photos URL via
+  `src/lib/images.ts` → `productImageUrl()`. Optional custom `imageUrl` on
+  Product (editable in admin) overrides the default. Letter-tile remains as
+  loading/missing fallback.
+
+🚨 STILL TO DO — do not drop these:
+1. Live PayFast sandbox integration (blocked on sneaky providing API credentials)
+2. Supabase migration for products/categories/orders (Phase 3)
+3. User accounts + auth (login/register, order history)
+4. Order confirmation emails
+5. SEO pass (metadata, sitemap, og images)
+6. Analytics events (view item, add to cart, purchase)
+7. Inventory low-stock alerts, coupon codes, product reviews

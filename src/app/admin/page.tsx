@@ -7,6 +7,7 @@ import { CATEGORIES } from "@/lib/catalog";
 import type { Product, Category, ColorKey } from "@/types";
 import { productsApi, categoriesApi } from "@/lib/storage";
 import { VALID_COLORS, colorOf, tileClass, tileInkClass } from "@/lib/colors";
+import { productImageUrl } from "@/lib/images";
 import {
   PlusIcon,
   TrashIcon2 as TrashIcon,
@@ -37,6 +38,7 @@ const EMPTY_PRODUCT: Omit<Product, "id"> = {
   gradient: "from-indigo-500 to-violet-600",
   badge: null,
   color: "indigo" as ColorKey,
+  imageUrl: null,
   createdAt: new Date().toISOString(),
 };
 
@@ -96,6 +98,7 @@ export default function AdminPage() {
       gradient: p.gradient,
       badge: p.badge,
       color: p.color,
+      imageUrl: p.imageUrl ?? null,
       createdAt: p.createdAt ?? new Date().toISOString(),
     });
     setShowForm(true);
@@ -103,10 +106,23 @@ export default function AdminPage() {
 
   const saveProduct = () => {
     if (!editing) return;
-    if (!editing.name.trim() || !editing.slug.trim()) {
-      toast.error("Name and slug are required.");
+    const errors: string[] = [];
+
+    if (!editing.name.trim()) errors.push("Product name is required");
+    if (!editing.slug.trim()) errors.push("Slug is required");
+    else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(editing.slug))
+      errors.push("Slug can only contain lowercase letters, numbers, and hyphens");
+
+    if (editing.priceCents < 0) errors.push("Price cannot be negative");
+    if (editing.stock < 0) errors.push("Stock cannot be negative");
+    if (editing.rating < 0 || editing.rating > 5) errors.push("Rating must be between 0 and 5");
+    if (editing.reviewCount < 0) errors.push("Review count cannot be negative");
+
+    if (errors.length) {
+      toast.error(errors.join(" • "));
       return;
     }
+
     if (editing.id) {
       productsApi.update(editing.id, editing);
     } else {
@@ -253,16 +269,25 @@ export default function AdminPage() {
                   key={p.id}
                   className="group flex items-center gap-4 rounded-2xl border border-border-soft bg-surface p-4 transition-shadow hover:shadow-soft"
                 >
-                  {/* Image swatch — duotone */}
-                  <div
-                    className={cn(
-                      "flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-border-soft text-xl font-bold",
-                      tileClass(colorOf(cKey)),
-                      tileInkClass(colorOf(cKey)),
-                    )}
-                  >
-                    {p.name.charAt(0)}
-                  </div>
+                  {/* Image swatch — custom photo, else duotone letter tile */}
+                  {p.imageUrl ? (
+                    <img
+                      src={productImageUrl(p)}
+                      alt=""
+                      loading="lazy"
+                      className="h-14 w-14 shrink-0 rounded-lg border border-border-soft object-cover"
+                    />
+                  ) : (
+                    <div
+                      className={cn(
+                        "flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-border-soft text-xl font-bold",
+                        tileClass(colorOf(cKey)),
+                        tileInkClass(colorOf(cKey)),
+                      )}
+                    >
+                      {p.name.charAt(0)}
+                    </div>
+                  )}
 
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-semibold text-ink truncate">
@@ -498,7 +523,28 @@ function ProductFormDrawer({
               <Field label="Slug *">
                 <input
                   value={form.slug}
-                  onChange={(e) => update("slug", e.target.value)}
+                  onChange={(e) =>
+                    update(
+                      "slug",
+                      e.target.value
+                        .toLowerCase()
+                        .replace(/\s+/g, "-")
+                        .replace(/[^a-z0-9-]/g, ""),
+                    )
+                  }
+                  onBlur={() => {
+                    // Auto-derive slug from name if empty
+                    if (!form.slug.trim() && form.name.trim()) {
+                      update(
+                        "slug",
+                        form.name
+                          .toLowerCase()
+                          .trim()
+                          .replace(/[^a-z0-9]+/g, "-")
+                          .replace(/^-+|-+$/g, ""),
+                      );
+                    }
+                  }}
                   className="w-full rounded-2xl border border-border-soft bg-cream/50 px-4 py-2.5 text-sm font-mono outline-none transition-colors focus:border-primary focus:bg-white"
                   placeholder="orbis-headphones"
                 />
@@ -620,6 +666,25 @@ function ProductFormDrawer({
                 className="w-full rounded-2xl border border-border-soft bg-cream/50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-primary focus:bg-white"
                 placeholder="e.g. Best seller, New (leave empty for none)"
               />
+            </Field>
+
+            {/* Image URL */}
+            <Field label="Image URL (optional)">
+              <input
+                value={form.imageUrl ?? ""}
+                onChange={(e) => update("imageUrl", e.target.value.trim() || null)}
+                className="w-full rounded-2xl border border-border-soft bg-cream/50 px-4 py-2.5 text-sm font-mono outline-none transition-colors focus:border-primary focus:bg-white"
+                placeholder="https://… (empty = auto stock photo for this slug)"
+              />
+              {form.imageUrl && (
+                <span className="mt-2 block h-20 w-20 overflow-hidden rounded-xl border border-border-soft">
+                  <img
+                    src={form.imageUrl}
+                    alt="Preview"
+                    className="h-full w-full object-cover"
+                  />
+                </span>
+              )}
             </Field>
 
             {/* Gradient alt */}

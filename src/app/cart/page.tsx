@@ -7,6 +7,7 @@ import { PRODUCTS_BY_ID } from "@/lib/catalog";
 import { formatZar } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { colorOf, tileClass, tileInkClass } from "@/lib/colors";
+import { productImageUrl } from "@/lib/images";
 import { MinusIcon, PlusIcon, XIcon } from "@/components/Icons";
 
 const FREE_SHIPPING_THRESHOLD_CENTS = 75000;
@@ -95,13 +96,22 @@ export default function CartPage() {
                   <Link
                     href={`/products/${p.slug}`}
                     className={cn(
-                      "flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border border-border-soft",
+                      "relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-soft",
                       tileClass(colorOf(p.color)),
                     )}
                   >
-                    <span className={`font-display text-2xl font-bold ${tileInkClass(colorOf(p.color))}`}>
+                    <span
+                      aria-hidden
+                      className={`absolute font-display text-2xl font-bold ${tileInkClass(colorOf(p.color))}`}
+                    >
                       {p.name.charAt(0)}
                     </span>
+                    <img
+                      src={productImageUrl(p)}
+                      alt={p.name}
+                      loading="lazy"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
                   </Link>
 
                   <div className="flex flex-1 flex-col">

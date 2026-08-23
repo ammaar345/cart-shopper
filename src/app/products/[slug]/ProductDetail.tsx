@@ -8,6 +8,7 @@ import { useCartStore } from "@/lib/store";
 import { formatZar } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { colorOf, tileClass, tileInkClass } from "@/lib/colors";
+import { productImageUrl } from "@/lib/images";
 import { Price } from "@/components/Price";
 import { ProductCard } from "@/components/ProductCard";
 import { CheckIcon, MinusIcon, PlusIcon, ShieldIcon, StarIcon, TruckIcon } from "@/components/Icons";
@@ -53,13 +54,21 @@ export function ProductDetail({
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4 }}
           className={cn(
-            "relative flex aspect-square items-center justify-center overflow-hidden rounded-card border border-border-soft",
+            "relative aspect-square overflow-hidden rounded-card border border-border-soft",
             tileClass(colorOf(product.color)),
           )}
         >
-          <span className={`font-display text-8xl font-bold ${tileInkClass(colorOf(product.color))}`}>
+          <span
+            aria-hidden
+            className={`absolute inset-0 flex items-center justify-center font-display text-8xl font-bold ${tileInkClass(colorOf(product.color))}`}
+          >
             {product.name.charAt(0)}
           </span>
+          <img
+            src={productImageUrl(product)}
+            alt={product.name}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
           <div className="absolute left-4 top-4 flex flex-col gap-2">
             {product.badge && (
               <span className="stamp stamp-dark">{product.badge}</span>

@@ -2,7 +2,7 @@
 
 import { formatZar } from "@/lib/format";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCartStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import CheckoutStepper from "@/components/CheckoutStepper";
@@ -11,9 +11,19 @@ import { toast } from "sonner";
 import type { CartItem } from "@/types";
 import { PRODUCTS_BY_ID } from "@/lib/catalog";
 
+function FieldError({ msg }: { msg: string | null }) {
+  if (!msg) return null;
+  return (
+    <p className="mt-1 text-sm text-error" role="alert">
+      {msg}
+    </p>
+  );
+}
+
 export default function CheckoutClient() {
   const { items } = useCartStore();
   const [step, setStep] = useState<"contact" | "shipping" | "payment" | "review">("contact");
+  const [isPlacing, setIsPlacing] = useState(false);
   const [formData, setFormData] = useState({
     contact: {
       email: "",
@@ -33,6 +43,75 @@ export default function CheckoutClient() {
   });
   const router = useRouter();
 
+  // Validation becomes visible for a section only after an attempted continue
+  const [attempted, setAttempted] = useState<{ contact?: boolean; shipping?: boolean }>({});
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const PHONE_RE = /^\+?[\d\s\-]{10,}$/;
+  const POSTAL_RE = /^\d{4}$/;
+
+  const contactErrors: { email: string | null; phone: string | null } = {
+    email: !formData.contact.email.trim()
+      ? "Email address is required"
+      : !EMAIL_RE.test(formData.contact.email)
+        ? "Please enter a valid email address"
+        : null,
+    phone: !formData.contact.phone.trim()
+      ? "Phone number is required"
+      : !PHONE_RE.test(formData.contact.phone)
+        ? "Please enter a valid phone number"
+        : null,
+  };
+
+  const SHIPPING_FIELDS: { key: keyof typeof formData.shipping; label: string }[] = [
+    { key: "firstName", label: "First name" },
+    { key: "lastName", label: "Last name" },
+    { key: "address", label: "Street address" },
+    { key: "city", label: "City" },
+    { key: "province", label: "Province" },
+    { key: "postalCode", label: "Postal code" },
+  ];
+
+  const shippingErrors = Object.fromEntries(
+    SHIPPING_FIELDS.map(({ key, label }) => [
+      key,
+      !formData.shipping[key].trim() ? `${label} is required` : null,
+    ]),
+  ) as Record<keyof typeof formData.shipping, string | null>;
+  if (formData.shipping.postalCode.trim() && !POSTAL_RE.test(formData.shipping.postalCode)) {
+    shippingErrors.postalCode = "Postal code must be 4 digits";
+  }
+
+  const showError =
+    (step: "contact" | "shipping", err: string | null, value: string): boolean =>
+    Boolean(err) && (attempted[step] === true || value.trim() !== "");
+
+  // Restore partial checkout state from sessionStorage so users can navigate away
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("cart-shopper-checkout-draft");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.formData) setFormData(parsed.formData);
+        if (parsed.step) setStep(parsed.step);
+      }
+    } catch {
+      // ignore — corrupt or unavailable storage
+    }
+  }, []);
+
+  // Persist on every change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        "cart-shopper-checkout-draft",
+        JSON.stringify({ formData, step }),
+      );
+    } catch {
+      // ignore
+    }
+  }, [formData, step]);
+
   // Calculate totals using actual product prices from catalog
   const subtotal = items.reduce((sum, item) => {
     const product = PRODUCTS_BY_ID[item.productId];
@@ -47,39 +126,27 @@ export default function CheckoutClient() {
 
   const handleNext = () => {
     switch (step) {
-      case "contact":
-        // Basic email and phone validation
-        const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contact.email);
-        const phoneValid = /^\+?[\d\s\-]{10,}$/.test(formData.contact.phone);
-
-        if (formData.contact.email && formData.contact.phone && emailValid && phoneValid) {
+      case "contact": {
+        if (!contactErrors.email && !contactErrors.phone) {
+          setAttempted((a) => ({ ...a, contact: false }));
           setStep("shipping");
         } else {
-          alert("Please fill in both email and phone number with valid formats");
+          setAttempted((a) => ({ ...a, contact: true }));
+          toast.error("Fix the highlighted fields to continue");
         }
         break;
-      case "shipping":
-        const requiredFields = [
-          "firstName",
-          "lastName",
-          "address",
-          "city",
-          "province",
-          "postalCode",
-        ];
-        const allFilled = requiredFields.every(
-          (field) => formData.shipping[field as keyof typeof formData.shipping].trim() !== ""
-        );
-
-        // Basic postal code validation for South Africa (4 digits)
-        const postalCodeValid = /^\d{4}$/.test(formData.shipping.postalCode);
-
-        if (allFilled && postalCodeValid) {
+      }
+      case "shipping": {
+        const hasErrors = Object.values(shippingErrors).some(Boolean);
+        if (!hasErrors) {
+          setAttempted((a) => ({ ...a, shipping: false }));
           setStep("payment");
         } else {
-          alert("Please fill in all shipping address fields with valid postal code (4 digits)");
+          setAttempted((a) => ({ ...a, shipping: true }));
+          toast.error("Fix the highlighted fields to continue");
         }
         break;
+      }
       case "payment":
         setStep("review");
         break;
@@ -105,6 +172,8 @@ export default function CheckoutClient() {
   };
 
   const handlePlaceOrder = async () => {
+    if (isPlacing) return; // prevent double-submit
+    setIsPlacing(true);
     try {
       // Simulate API delay
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -158,6 +227,13 @@ export default function CheckoutClient() {
       // Clear cart after order
       useCartStore.getState().clear();
 
+      // Clear checkout draft so the next visit starts fresh
+      try {
+        sessionStorage.removeItem("cart-shopper-checkout-draft");
+      } catch {
+        // ignore
+      }
+
       // Show success message using toast
       toast.success("Payment successful! Your order has been placed.", {
         description: "You'll be redirected to your order confirmation page.",
@@ -168,6 +244,8 @@ export default function CheckoutClient() {
     } catch (error) {
       toast.error("Failed to place order. Please try again.");
       console.error("Order placement error:", error);
+    } finally {
+      setIsPlacing(false);
     }
   };
 
@@ -311,11 +389,13 @@ export default function CheckoutClient() {
                                 contact: { ...formData.contact, email: e.target.value },
                               })
                             }
-                            className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50"
+                            aria-invalid={showError("contact", contactErrors.email, formData.contact.email)}
+                            className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50 aria-[invalid=true]:border-error"
                             placeholder="you@example.com"
+                            autoComplete="email"
                           />
-                          {formData.contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contact.email) && (
-                            <p className="mt-1 text-sm text-error">Please enter a valid email address</p>
+                          {showError("contact", contactErrors.email, formData.contact.email) && (
+                            <p className="mt-1 text-sm text-error" role="alert">{contactErrors.email}</p>
                           )}
                         </div>
 
@@ -334,11 +414,13 @@ export default function CheckoutClient() {
                                 contact: { ...formData.contact, phone: e.target.value },
                               })
                             }
-                            className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50"
+                            aria-invalid={showError("contact", contactErrors.phone, formData.contact.phone)}
+                            className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50 aria-[invalid=true]:border-error"
                             placeholder="+27 12 345 6789"
+                            autoComplete="tel"
                           />
-                          {formData.contact.phone && !/^\+?[\d\s\-]{10,}$/.test(formData.contact.phone) && (
-                            <p className="mt-1 text-sm text-error">Please enter a valid phone number</p>
+                          {showError("contact", contactErrors.phone, formData.contact.phone) && (
+                            <p className="mt-1 text-sm text-error" role="alert">{contactErrors.phone}</p>
                           )}
                         </div>
 
@@ -376,8 +458,12 @@ export default function CheckoutClient() {
                                   shipping: { ...formData.shipping, firstName: e.target.value },
                                 })
                               }
-                              className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50"
+                              aria-invalid={Boolean(attempted.shipping && shippingErrors.firstName)}
+                              className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50 aria-[invalid=true]:border-error"
                             />
+                            {attempted.shipping && (
+                              <FieldError msg={shippingErrors.firstName} />
+                            )}
                           </div>
 
                           <div>
@@ -395,8 +481,12 @@ export default function CheckoutClient() {
                                   shipping: { ...formData.shipping, lastName: e.target.value },
                                 })
                               }
-                              className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50"
+                              aria-invalid={Boolean(attempted.shipping && shippingErrors.lastName)}
+                              className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50 aria-[invalid=true]:border-error"
                             />
+                            {attempted.shipping && (
+                              <FieldError msg={shippingErrors.lastName} />
+                            )}
                           </div>
                         </div>
 
@@ -415,8 +505,12 @@ export default function CheckoutClient() {
                                 shipping: { ...formData.shipping, address: e.target.value },
                               })
                             }
-                            className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50"
+                            aria-invalid={Boolean(attempted.shipping && shippingErrors.address)}
+                            className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50 aria-[invalid=true]:border-error"
                           />
+                          {attempted.shipping && (
+                            <FieldError msg={shippingErrors.address} />
+                          )}
                         </div>
 
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -435,8 +529,12 @@ export default function CheckoutClient() {
                                   shipping: { ...formData.shipping, city: e.target.value },
                                 })
                               }
-                              className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50"
+                              aria-invalid={Boolean(attempted.shipping && shippingErrors.city)}
+                              className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50 aria-[invalid=true]:border-error"
                             />
+                            {attempted.shipping && (
+                              <FieldError msg={shippingErrors.city} />
+                            )}
                           </div>
 
                           <div>
@@ -453,7 +551,8 @@ export default function CheckoutClient() {
                                   shipping: { ...formData.shipping, province: e.target.value },
                                 })
                               }
-                              className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50"
+                              aria-invalid={Boolean(attempted.shipping && shippingErrors.province)}
+                              className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50 aria-[invalid=true]:border-error"
                             >
                               <option value="">Select province</option>
                               <option value="Western Cape">Western Cape</option>
@@ -466,6 +565,9 @@ export default function CheckoutClient() {
                               <option value="Mpumalanga">Mpumalanga</option>
                               <option value="Limpopo">Limpopo</option>
                             </select>
+                            {attempted.shipping && (
+                              <FieldError msg={shippingErrors.province} />
+                            )}
                           </div>
                         </div>
 
@@ -477,6 +579,7 @@ export default function CheckoutClient() {
                             id="postalCode"
                             type="text"
                             required
+                            inputMode="numeric"
                             value={formData.shipping.postalCode}
                             onChange={(e) =>
                               setFormData({
@@ -484,12 +587,25 @@ export default function CheckoutClient() {
                                 shipping: { ...formData.shipping, postalCode: e.target.value },
                               })
                             }
-                            className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50"
+                            aria-invalid={
+                              formData.shipping.postalCode.trim() !== "" &&
+                              !POSTAL_RE.test(formData.shipping.postalCode)
+                            }
+                            className="w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-primary focus:ring-opacity-50 aria-[invalid=true]:border-error"
                             placeholder="0000"
+                            autoComplete="postal-code"
                           />
-                          {formData.shipping.postalCode && !/^\d{4}$/.test(formData.shipping.postalCode) && (
-                            <p className="mt-1 text-sm text-error">Please enter a valid 4-digit postal code</p>
-                          )}
+                          <FieldError
+                            msg={
+                              formData.shipping.postalCode.trim() === ""
+                                ? attempted.shipping
+                                  ? shippingErrors.postalCode
+                                  : null
+                                : !POSTAL_RE.test(formData.shipping.postalCode)
+                                  ? "Please enter a valid 4-digit postal code"
+                                  : null
+                            }
+                          />
                         </div>
 
                         <div className="flex justify-between">
@@ -573,9 +689,20 @@ export default function CheckoutClient() {
                           <button
                             type="button"
                             onClick={handlePlaceOrder}
-                            className="w-full btn btn-primary btn-lg"
+                            disabled={isPlacing}
+                            className="w-full btn btn-primary btn-lg disabled:cursor-not-allowed disabled:opacity-70"
                           >
-                            Place order
+                            {isPlacing ? (
+                              <>
+                                <svg className="mr-2 h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+                                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                               </svg>
+                                Processing…
+                              </>
+                            ) : (
+                              "Place order"
+                            )}
                           </button>
                         </div>
                       </div>
@@ -674,9 +801,20 @@ export default function CheckoutClient() {
                           <button
                             type="button"
                             onClick={handlePlaceOrder}
-                            className="ml-4 w-full btn btn-primary btn-lg"
+                            disabled={isPlacing}
+                            className="ml-4 w-full btn btn-primary btn-lg disabled:cursor-not-allowed disabled:opacity-70"
                           >
-                            Place order securely
+                            {isPlacing ? (
+                              <>
+                                <svg className="mr-2 h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+                                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                               </svg>
+                                Processing…
+                              </>
+                            ) : (
+                              "Place order securely"
+                            )}
                           </button>
                         </div>
                       </div>

@@ -7,6 +7,7 @@ import { PRODUCTS_BY_ID } from "@/lib/catalog";
 import { formatZar } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { colorOf, tileClass, tileInkClass } from "@/lib/colors";
+import { productImageUrl } from "@/lib/images";
 import { MinusIcon, PlusIcon, XIcon, ArrowRightIcon } from "./Icons";
 
 const FREE_SHIP_CENTS = 75000;
@@ -162,18 +163,27 @@ export function CartDrawer() {
                           }}
                           className="flex gap-3 rounded-card border border-border-soft bg-surface p-3 shadow-soft"
                         >
-                          {/* Image — duotone tile */}
+                          {/* Image — photo over duotone tile */}
                           <Link
                             href={`/products/${p.slug}`}
                             onClick={close}
                             className={cn(
-                              "flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-lg",
+                              "relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-lg",
                               tileClass(colorOf(p.color)),
                             )}
                           >
-                            <span className={`font-display text-lg font-bold ${tileInkClass(colorOf(p.color))}`}>
+                            <span
+                              aria-hidden
+                              className={`absolute font-display text-lg font-bold ${tileInkClass(colorOf(p.color))}`}
+                            >
                               {p.name.charAt(0)}
                             </span>
+                            <img
+                              src={productImageUrl(p)}
+                              alt={p.name}
+                              loading="lazy"
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
                           </Link>
 
                           {/* Details */}

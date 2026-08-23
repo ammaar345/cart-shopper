@@ -42,6 +42,8 @@ export interface Product {
   stock: number;
   /** Tailwind gradient classes for the placeholder "image". */
   gradient: string;
+  /** Custom photo URL. When unset, a deterministic picsum.photos image is used per slug. */
+  imageUrl?: string | null;
   /** Badge label (e.g. "Best seller", "New"); null when none. */
   badge: string | null;
   /** huashu-design color key — ensures consistent palette across the app. */
