@@ -141,6 +141,27 @@ Done:
 4. Order confirmation emails
 5. Analytics events (view item, add to cart, purchase)
 
+## What sneaky needs to do (action items)
+
+- [ ] **Test the Aug 23 build** (~5 min): `npm run dev` → http://localhost:3000/shop →
+  add 2 items → apply `WELCOME10` in the cart → complete checkout → verify `/orders`
+  shows the discounted order and `/admin` shows photos, coupon tab, low-stock banner.
+- [ ] **PayFast sandbox** (~10 min) — BLOCKER for real payments: register at
+  https://payfast.io, enable Sandbox, hand over Merchant ID + Merchant Key +
+  passphrase so the hosted-checkout redirect + ITN confirmation can be wired.
+- [ ] **Supabase project** (~10 min): follow SUPABASE.md — free project at
+  https://supabase.com/dashboard → run `supabase/schema.sql` in its SQL editor →
+  put URL + anon key in `.env.local`. Orders start syncing to a real DB immediately.
+- [ ] **Set `NEXT_PUBLIC_SITE_URL`** in `.env.local` before any deploy — sitemap.xml,
+  robots.txt, and Open Graph URLs otherwise emit http://localhost:3000.
+- [ ] **Real product photos before launch**: picsum placeholders are random
+  landscapes — source real shots and paste URLs into each product's Image URL
+  field in /admin (no code changes needed).
+- [ ] **Pick an email provider** for order confirmations (suggested: Resend free
+  tier) and say the word so it gets wired.
+- [ ] **Decide store name + real catalog** — brand-neutral seeds ("Cart Shopper",
+  18 demo products) need replacing with the real lineup before going live.
+
 Done since Aug 23 session start:
 - SEO pack: metadata templates, per-product OG images, sitemap.xml, robots.txt,
   noindex layouts for cart/checkout/admin/orders (src/lib/site.ts holds SITE_URL)
